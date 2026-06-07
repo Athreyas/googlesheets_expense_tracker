@@ -49,7 +49,7 @@ You add an expense ─▶ Expenses sheet (raw record)
                      Ledger sheet  (auto-rebuilt: one row per person per txn — Paid vs Share)
                          │
                          ▼
-        Dashboard + Balances  (100% live formulas: net = Paid − Share)
+        Dashboard  (100% live formulas: net = Paid − Share, plus suggested settlements)
 ```
 
 Because balances are formulas reading a rebuilt ledger — never hand-written numbers — a single
@@ -60,8 +60,7 @@ Because balances are formulas reading a rebuilt ledger — never hand-written nu
 | Sheet | Purpose |
 |---|---|
 | **About** | Quick-start guide and split-type reference |
-| **Dashboard** | Month summary, quick stats, spending by person |
-| **Balances** | Net balance per person + suggested "who pays whom" |
+| **Dashboard** | Month KPIs, spending & net balance per person, and suggested "who pays whom" |
 | **Expenses** | Every transaction (the source of truth) |
 | *Master Users* | People list (hidden) |
 | *Ledger* | Auto-generated math cache — do not edit (hidden) |
@@ -86,7 +85,7 @@ Treat it purely as a **view** — the spreadsheet and Apps Script stay the syste
 Canvas reads a **single tab**, so run this on the **Expenses** sheet (the one tab that holds every
 raw transaction). Gemini derives the per-person balances and suggested settlements from the split
 details; those derived figures are for at-a-glance display, while the authoritative balances live
-on the locked **Dashboard** and **Balances** sheets computed by the script. Keep adding and settling
+on the locked **Dashboard** sheet computed by the script. Keep adding and settling
 through the **💰 Expense Manager** menu so the math stays exact.
 
 **To use it:** open the **Expenses** tab → **Insert → Create a canvas** → paste the prompt below.
@@ -139,8 +138,8 @@ Follow-up tweaks you can layer on with another prompt: *"Switch to dark mode,"* 
 more compact,"* or *"Show the latest 10 transactions instead of 6."*
 
 > Canvas is experimental and only reads one tab, so the balances it shows are Gemini's
-> interpretation of the Expenses data. For the exact, tested figures, rely on the Dashboard and
-> Balances sheets.
+> interpretation of the Expenses data. For the exact, tested figures, rely on the locked Dashboard
+> sheet.
 
 
 ## Notes

@@ -147,7 +147,6 @@ function processSetup(users) {
     createLedgerSheet();
     createArchivesSheet();
     createDashboardSheet(userArray);
-    createBalancesSheet(userArray);
 
     var tempSheet = ss.getSheetByName('Temp');
     if (tempSheet) ss.deleteSheet(tempSheet);
@@ -165,7 +164,7 @@ function processSetup(users) {
 
 function reorderSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var order = [CONFIG.sheets.about, CONFIG.sheets.dashboard, CONFIG.sheets.balances, CONFIG.sheets.expenses];
+  var order = [CONFIG.sheets.about, CONFIG.sheets.dashboard, CONFIG.sheets.expenses];
   for (var i = 0; i < order.length; i++) {
     var sheet = ss.getSheetByName(order[i]);
     if (sheet && !sheet.isSheetHidden()) {
@@ -187,22 +186,28 @@ function setupAboutSheet() {
 
   sheet.setName(CONFIG.sheets.about);
   sheet.clear();
-  sheet.setColumnWidth(1, 80);
-  sheet.setColumnWidth(2, 720);
+  sheet.setColumnWidth(1, 155);
+  sheet.setColumnWidth(2, 645);
 
   var headerRange = sheet.getRange('A1:B1').merge();
-  headerRange.setValue('💰 EXPENSE TRACKER - QUICK START GUIDE')
-    .setFontFamily(CONFIG.fonts.header).setFontSize(28).setFontWeight('bold')
+  headerRange.setValue('💰 EXPENSE TRACKER — QUICK START GUIDE')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(22).setFontWeight('bold')
     .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
     .setVerticalAlignment('middle').setHorizontalAlignment('center');
-  sheet.setRowHeight(1, 80);
+  sheet.setRowHeight(1, 56);
 
   var r = 2;
   sheet.getRange(r, 1, 1, 2).merge();
   sheet.getRange(r, 1).setValue('📝 Developed by Athreyas using Claude (Anthropic AI)')
-    .setFontFamily(CONFIG.fonts.body).setFontStyle('italic').setFontSize(11)
+    .setFontFamily(CONFIG.fonts.body).setFontStyle('italic').setFontSize(10)
     .setBackground('#f1f3f4').setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(r, 35); r++;
+  sheet.setRowHeight(r, 26); r++;
+
+  sheet.getRange(r, 1, 1, 2).merge();
+  sheet.getRange(r, 1).setFormula('=HYPERLINK("https://github.com/Athreyas/googlesheets_expense_tracker","🔗 View this project on GitHub")')
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontColor('#1a73e8')
+    .setBackground('#f1f3f4').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setRowHeight(r, 26); r++;
 
   sheet.getRange(r, 1, 1, 2).merge();
   sheet.getRange(r, 1).setValue('Welcome! This tool helps you track shared expenses with roommates, friends, or family. Split bills fairly and see who owes whom at a glance.')
@@ -211,18 +216,18 @@ function setupAboutSheet() {
   sheet.setRowHeight(r, 50); r += 2;
 
   r = aboutSection(sheet, r, '✨ KEY FEATURES', '#34a853', [
-    ['📊', 'Live dashboard with current month stats and balance overview'],
+    ['📊', 'Live dashboard: month stats, per-person balances, and suggested settlements'],
     ['💳', 'Multiple split types: Equal, Exact amounts, Percentages, or Shares'],
-    ['⚖️', 'Net balance summary showing exactly who is up and who is down'],
+    ['⚖️', 'Net balance per person showing exactly who is up and who is down'],
     ['🔄', 'Automatic calculations - balances update the moment you add data'],
     ['📦', 'Archive old expenses to keep current data clean'],
     ['➕', 'Add new users anytime without losing data']
-  ], '#f8f9fa', 35, 11, 18);
+  ], '#f8f9fa', 32, 11, 16);
 
   r++;
   r = aboutSection(sheet, r, '🚀 QUICK START (3 SIMPLE STEPS)', '#ea4335', [
     ['1️⃣', 'ADD AN EXPENSE\nMenu → Add Expense → Fill details → Choose split type → Submit\nExample: "Groceries $120, paid by John, split equally among everyone"'],
-    ['2️⃣', 'CHECK BALANCES\nDashboard shows who owes what | Balances sheet shows the net summary\nGreen = owed to you | Red = you owe them'],
+    ['2️⃣', 'CHECK THE DASHBOARD\nThe Dashboard shows spending, net balances, and suggested settlements all in one place\nGreen = owed to them | Red = they owe'],
     ['3️⃣', 'RECORD SETTLEMENT\nMenu → Add Settlement → Select who paid whom → Enter amount\nBalances update automatically!']
   ], '#fff3cd', 65, 11, 24);
 
@@ -236,10 +241,9 @@ function setupAboutSheet() {
 
   r++;
   r = aboutSection(sheet, r, '📱 SHEET NAVIGATION', '#9c27b0', [
-    ['📊 DASHBOARD', 'Current month summary | Spending by person | Quick balance overview'],
-    ['💳 EXPENSES', 'All transaction history | See split details for every entry'],
-    ['⚖️ BALANCES', 'Net balance per person | See who is owed and who owes']
-  ], '#f3e5f5', 40, 10, 11);
+    ['📊 DASHBOARD', 'Month summary, spending & net balance per person, and suggested settlements'],
+    ['💳 EXPENSES', 'All transaction history | See split details for every entry']
+  ], '#f3e5f5', 38, 10, 11);
 
   r++;
   // Important notes (full-width rows)
@@ -280,9 +284,9 @@ function aboutSection(sheet, startRow, title, titleBg, rows, bodyBg, rowH, bodyF
   var r = startRow;
   sheet.getRange(r, 1, 1, 2).merge();
   sheet.getRange(r, 1).setValue(title)
-    .setFontFamily(CONFIG.fonts.header).setFontSize(16).setFontWeight('bold')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(14).setFontWeight('bold')
     .setBackground(titleBg).setFontColor('#ffffff').setHorizontalAlignment('center');
-  sheet.setRowHeight(r, 35); r++;
+  sheet.setRowHeight(r, 32); r++;
 
   for (var i = 0; i < rows.length; i++) {
     sheet.getRange(r, 1).setValue(rows[i][0])
@@ -432,207 +436,141 @@ function createArchivesSheet() {
 }
 
 /**
- * DASHBOARD — every value is a live formula.
- * Layout is ordered so the per-person table is LAST, so adding a user simply
+ * DASHBOARD — the single overview sheet (the old Balances tab is merged in).
+ *   Top: a compact KPI band (four cards).
+ *   Left region (A–E): spending + net balance per person — all live formulas.
+ *   Right region (F–H): suggested settlements — regenerated on every rebuild.
+ * Both tables are the last thing in their columns, so adding a user just
  * appends a row with nothing below to overwrite.
  */
+var DASH = {
+  personHeaderRow: 10, // "Person | Total Spent | # Transactions | Net Balance | Status"
+  personDataRow: 11,
+  sugHeaderRow: 10,    // "Who Pays | Who Receives | Amount"
+  sugDataRow: 11,
+  sugFirstCol: 6       // column F
+};
+
 function createDashboardSheet(userArray) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var existing = ss.getSheetByName(CONFIG.sheets.dashboard);
   if (existing) ss.deleteSheet(existing);
 
   var sheet = ss.insertSheet(CONFIG.sheets.dashboard);
-  sheet.setColumnWidth(1, 240);
-  sheet.setColumnWidth(2, 150);
-  sheet.setColumnWidth(3, 140);
-  sheet.setColumnWidth(4, 140);
-  sheet.setColumnWidth(5, 200);
+  sheet.setColumnWidth(1, 180); // Person
+  sheet.setColumnWidth(2, 120); // Total Spent
+  sheet.setColumnWidth(3, 120); // # Transactions
+  sheet.setColumnWidth(4, 130); // Net Balance
+  sheet.setColumnWidth(5, 150); // Status
+  sheet.setColumnWidth(6, 150); // Who Pays
+  sheet.setColumnWidth(7, 160); // Who Receives
+  sheet.setColumnWidth(8, 120); // Amount
 
   // Title
-  sheet.getRange('A1:E1').merge().setValue('📊 EXPENSE DASHBOARD')
-    .setFontFamily(CONFIG.fonts.header).setFontSize(26).setFontWeight('bold')
+  sheet.getRange('A1:H1').merge().setValue('📊 EXPENSE DASHBOARD')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(22).setFontWeight('bold')
     .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 70);
+  sheet.setRowHeight(1, 54);
 
   // Live date
-  sheet.getRange('A2:E2').merge().setFormula('=TEXT(TODAY(),"dddd, MMMM dd, yyyy")')
-    .setFontFamily(CONFIG.fonts.body).setFontSize(11).setFontStyle('italic').setFontColor('#5f6368')
+  sheet.getRange('A2:H2').merge().setFormula('=TEXT(TODAY(),"dddd, MMMM dd, yyyy")')
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontStyle('italic').setFontColor('#5f6368')
     .setHorizontalAlignment('center').setVerticalAlignment('middle').setBackground('#f8f9fa');
-  sheet.setRowHeight(2, 30);
+  sheet.setRowHeight(2, 24);
+  sheet.setRowHeight(3, 8);
 
-  // Month boundaries used by the month-scoped formulas
+  // KPI band — four compact cards, each spanning two columns
   var monthStart = '(EOMONTH(TODAY(),-1)+1)';
   var monthEnd = 'EOMONTH(TODAY(),0)';
-
-  // CURRENT MONTH SUMMARY
-  var row = 4;
-  sectionHeader(sheet, row, 5, '💰 CURRENT MONTH SUMMARY', '#34a853'); row++;
-  var monthRows = [
-    ['📈 Total Expenses (this month)',
-      '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Expense",Expenses!$A$3:$A,">="&' + monthStart + ',Expenses!$A$3:$A,"<="&' + monthEnd + '),0)', '$#,##0.00'],
-    ['📝 Number of Expenses (this month)',
-      '=IFERROR(COUNTIFS(Expenses!$H$3:$H,"Expense",Expenses!$A$3:$A,">="&' + monthStart + ',Expenses!$A$3:$A,"<="&' + monthEnd + '),0)', '#,##0'],
-    ['💸 Total Settlements (this month)',
-      '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Settlement",Expenses!$A$3:$A,">="&' + monthStart + ',Expenses!$A$3:$A,"<="&' + monthEnd + '),0)', '$#,##0.00']
+  var cards = [
+    { col: 1, label: 'MONTH SPENT', accent: '#188038', fmt: '$#,##0.00',
+      value: '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Expense",Expenses!$A$3:$A,">="&' + monthStart + ',Expenses!$A$3:$A,"<="&' + monthEnd + '),0)' },
+    { col: 3, label: 'MONTH EXPENSES', accent: '#1a73e8', fmt: '#,##0',
+      value: '=IFERROR(COUNTIFS(Expenses!$H$3:$H,"Expense",Expenses!$A$3:$A,">="&' + monthStart + ',Expenses!$A$3:$A,"<="&' + monthEnd + '),0)' },
+    { col: 5, label: 'ALL-TIME SPENT', accent: '#d93025', fmt: '$#,##0.00',
+      value: '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Expense"),0)' },
+    { col: 7, label: 'ACTIVE PEOPLE', accent: '#9334e6', fmt: '#,##0',
+      value: "=COUNTA('Master Users'!$B$3:$B)" }
   ];
-  row = keyValueRows(sheet, row, monthRows, CONFIG.colors.primaryBg);
-  row++;
+  for (var c = 0; c < cards.length; c++) {
+    var cd = cards[c];
+    sheet.getRange(4, cd.col, 1, 2).merge().setValue(cd.label)
+      .setFontFamily(CONFIG.fonts.header).setFontSize(9).setFontWeight('bold').setFontColor(cd.accent)
+      .setBackground('#f8f9fa').setHorizontalAlignment('center').setVerticalAlignment('middle');
+    sheet.getRange(5, cd.col, 1, 2).merge().setFormula(cd.value)
+      .setFontFamily(CONFIG.fonts.header).setFontSize(17).setFontWeight('bold').setFontColor('#202124')
+      .setBackground('#f8f9fa').setHorizontalAlignment('center').setVerticalAlignment('middle')
+      .setNumberFormat(cd.fmt);
+    sheet.getRange(4, cd.col, 2, 2).setBorder(true, true, true, true, false, false, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
+  }
+  sheet.setRowHeight(4, 20);
+  sheet.setRowHeight(5, 40);
+  sheet.setRowHeight(6, 10);
 
-  // QUICK STATS
-  sectionHeader(sheet, row, 5, '📋 QUICK STATS', '#fbbc04'); row++;
-  var statRows = [
-    ['🏠 Total Active Users', "=COUNTA('Master Users'!$B$3:$B)", '#,##0'],
-    ['📊 Total All-Time Expenses', '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Expense"),0)', '$#,##0.00'],
-    ['🔄 Total All-Time Settlements', '=IFERROR(SUMIFS(Expenses!$C$3:$C,Expenses!$H$3:$H,"Settlement"),0)', '$#,##0.00'],
-    ['📝 Total Transactions Ever', '=IFERROR(COUNTA(Expenses!$A$3:$A),0)', '#,##0']
-  ];
-  row = keyValueRows(sheet, row, statRows, '#fff3e0');
-  row++;
-
-  // Tip line (placed ABOVE the growing table on purpose)
-  sheet.getRange(row, 1, 1, 5).merge()
-    .setValue('💡 Net Balance shows who is up or down overall. Green ✅ = owed to them | Red ❌ = they owe | Check the Balances sheet for the summary.')
-    .setFontFamily(CONFIG.fonts.body).setFontStyle('italic').setFontSize(10)
-    .setBackground('#e8f5fe').setFontColor('#1967d2').setWrap(true)
+  // Helper tip line (full width, above the growing tables)
+  sheet.getRange(7, 1, 1, 8).merge()
+    .setValue('💡 Net Balance = who is up or down overall.   ✅ Green = owed to them   ❌ Red = they owe.   "Suggested Settlements" lists the fewest payments to settle everyone up.')
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontStyle('italic')
+    .setBackground('#e8f0fe').setFontColor('#1967d2').setWrap(true)
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(row, 44);
-  row += 2;
+  sheet.setRowHeight(7, 32);
+  sheet.setRowHeight(8, 8);
 
-  // SPENDING BY PERSON (LAST section so it can grow)
-  sectionHeader(sheet, row, 5, '👥 SPENDING BY PERSON', '#ea4335'); row++;
-  sheet.getRange(row, 1, 1, 5).setValues([['Person', 'Total Spent', '# Transactions', 'Net Balance', 'Status']])
-    .setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(11)
+  // Side-by-side section headers
+  sheet.getRange(9, 1, 1, 5).merge().setValue('👥 SPENDING BY PERSON')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(13).setFontWeight('bold')
+    .setBackground('#ea4335').setFontColor('#ffffff').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange(9, 6, 1, 3).merge().setValue('💸 SUGGESTED SETTLEMENTS')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(13).setFontWeight('bold')
+    .setBackground('#1a73e8').setFontColor('#ffffff').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setRowHeight(9, 32);
+
+  // Table headers
+  sheet.getRange(DASH.personHeaderRow, 1, 1, 5).setValues([['Person', 'Total Spent', '# Transactions', 'Net Balance', 'Status']])
+    .setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(10)
     .setBackground('#f1f3f4').setHorizontalAlignment('center');
-  sheet.setRowHeight(row, 38);
-  var headerRow = row; row++;
+  sheet.getRange(DASH.sugHeaderRow, DASH.sugFirstCol, 1, 3).setValues([['Who Pays', 'Who Receives', 'Amount']])
+    .setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(10)
+    .setBackground('#f1f3f4').setHorizontalAlignment('center');
+  sheet.setRowHeight(DASH.personHeaderRow, 30);
 
+  // Per-person rows (left region)
+  var row = DASH.personDataRow;
   for (var i = 0; i < userArray.length; i++) {
     writeDashboardPersonRow(sheet, row, userArray[i], CONFIG.colors.userColors[i % CONFIG.colors.userColors.length]);
     row++;
   }
   if (userArray.length > 0) {
-    sheet.getRange(headerRow, 1, userArray.length + 1, 5)
+    sheet.getRange(DASH.personHeaderRow, 1, userArray.length + 1, 5)
       .setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
   }
 
-  if (sheet.getMaxColumns() > 5) sheet.hideColumns(6, sheet.getMaxColumns() - 5);
+  if (sheet.getMaxColumns() > 8) sheet.hideColumns(9, sheet.getMaxColumns() - 8);
   lockSheet(sheet, 'Dashboard');
   sheet.setFrozenRows(2);
 }
 
-/** Writes the five formula-driven cells for one Dashboard person row. */
+/** Writes the five formula-driven cells for one Dashboard person row (A–E). */
 function writeDashboardPersonRow(sheet, row, name, color) {
-  var safe = name.replace(/"/g, '""');
-  sheet.getRange(row, 1).setValue(name).setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setBackground(color);
+  sheet.getRange(row, 1).setValue(name).setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontWeight('bold').setBackground(color);
   sheet.getRange(row, 2)
     .setFormula('=IFERROR(SUMIFS(Ledger!$C$3:$C,Ledger!$B$3:$B,$A' + row + ',Ledger!$E$3:$E,"Expense"),0)')
-    .setNumberFormat('$#,##0.00').setHorizontalAlignment('center').setBackground(color);
+    .setNumberFormat('$#,##0.00').setFontSize(10).setHorizontalAlignment('center').setBackground(color);
   sheet.getRange(row, 3)
     .setFormula('=IFERROR(COUNTIFS(Expenses!$D$3:$D,$A' + row + ',Expenses!$H$3:$H,"Expense"),0)')
-    .setNumberFormat('#,##0').setHorizontalAlignment('center').setBackground(color);
+    .setNumberFormat('#,##0').setFontSize(10).setHorizontalAlignment('center').setBackground(color);
   sheet.getRange(row, 4)
     .setFormula('=IFERROR(SUMIFS(Ledger!$C$3:$C,Ledger!$B$3:$B,$A' + row + ')-SUMIFS(Ledger!$D$3:$D,Ledger!$B$3:$B,$A' + row + '),0)')
-    .setNumberFormat('$#,##0.00').setHorizontalAlignment('center').setFontWeight('bold').setBackground(color);
+    .setNumberFormat('$#,##0.00').setFontSize(10).setHorizontalAlignment('center').setFontWeight('bold').setBackground(color);
   sheet.getRange(row, 5)
     .setFormula('=IF($D' + row + '>0.005,"✅ Owed $"&TEXT($D' + row + ',"#,##0.00"),IF($D' + row + '<-0.005,"❌ Owes $"&TEXT(-$D' + row + ',"#,##0.00"),"Even"))')
-    .setHorizontalAlignment('center').setFontWeight('bold').setFontSize(10).setBackground(color);
-  sheet.setRowHeight(row, 35);
+    .setFontSize(9).setHorizontalAlignment('center').setFontWeight('bold').setBackground(color);
+  sheet.setRowHeight(row, 30);
 }
 
-/**
- * BALANCES — net balance per person, all live formulas.
- * The table is the LAST thing on the sheet so it can grow safely.
- */
-/**
- * BALANCES sheet has TWO side-by-side regions:
- *   Columns A-D : net balance per person (live formulas, grows downward)
- *   Columns F-H : suggested settlements (script-regenerated on every rebuild)
- * Keeping them in separate columns means adding a user (which appends to the
- * A-D table) can never collide with the suggestions block.
- */
-var BAL = {
-  netHeaderRow: 5,   // row with "Person | Owed To Them | They Owe | Net Balance"
-  sugTitleRow: 4,    // row with "SUGGESTED SETTLEMENTS"
-  sugHeaderRow: 5,   // row with "Who Pays | Who Receives | Amount"
-  sugDataRow: 6,     // first suggestion row
-  sugFirstCol: 6     // column F
-};
-
-function createBalancesSheet(userArray) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var existing = ss.getSheetByName(CONFIG.sheets.balances);
-  if (existing) ss.deleteSheet(existing);
-
-  var sheet = ss.insertSheet(CONFIG.sheets.balances);
-  sheet.setColumnWidth(1, 200); // A Person
-  sheet.setColumnWidth(2, 150); // B Owed To Them
-  sheet.setColumnWidth(3, 150); // C They Owe
-  sheet.setColumnWidth(4, 150); // D Net Balance
-  sheet.setColumnWidth(5, 30);  // E spacer
-  sheet.setColumnWidth(6, 170); // F Who Pays
-  sheet.setColumnWidth(7, 170); // G Who Receives
-  sheet.setColumnWidth(8, 130); // H Amount
-
-  // Title spans both regions
-  sheet.getRange('A1:H1').merge().setValue('⚖️ BALANCE SUMMARY')
-    .setFontFamily(CONFIG.fonts.header).setFontSize(26).setFontWeight('bold')
-    .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
-    .setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setRowHeight(1, 70);
-
-  sheet.getRange('A2:H2').merge()
-    .setValue('💡 Positive = money owed to them | Negative = money they owe | The right-hand list is the fewest payments needed to settle everyone up')
-    .setFontFamily(CONFIG.fonts.body).setFontStyle('italic').setFontSize(11)
-    .setBackground(CONFIG.colors.primaryBg).setFontColor('#1967d2')
-    .setHorizontalAlignment('center').setWrap(true);
-  sheet.setRowHeight(2, 40);
-
-  // ---- LEFT: net balance table (A-D) ----
-  sectionHeader(sheet, 4, 4, '📊 WHO OWES WHAT', '#34a853');
-  sheet.getRange(BAL.netHeaderRow, 1, 1, 4).setValues([['Person', 'Total Owed To Them', 'Total They Owe', 'Net Balance']])
-    .setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(11)
-    .setBackground('#f1f3f4').setHorizontalAlignment('center');
-  sheet.setRowHeight(BAL.netHeaderRow, 38);
-
-  var row = BAL.netHeaderRow + 1;
-  for (var i = 0; i < userArray.length; i++) {
-    writeBalancesPersonRow(sheet, row, userArray[i], CONFIG.colors.userColors[i % CONFIG.colors.userColors.length]);
-    row++;
-  }
-  if (userArray.length > 0) {
-    sheet.getRange(BAL.netHeaderRow, 1, userArray.length + 1, 4)
-      .setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
-  }
-
-  // ---- RIGHT: settlement suggestions scaffold (F-H) ----
-  sheet.getRange(BAL.sugTitleRow, BAL.sugFirstCol, 1, 3).merge().setValue('💸 SUGGESTED SETTLEMENTS')
-    .setFontFamily(CONFIG.fonts.header).setFontSize(15).setFontWeight('bold')
-    .setBackground('#1a73e8').setFontColor('#ffffff').setHorizontalAlignment('center');
-  sheet.setRowHeight(BAL.sugTitleRow, 40);
-  sheet.getRange(BAL.sugHeaderRow, BAL.sugFirstCol, 1, 3).setValues([['Who Pays', 'Who Receives', 'Amount']])
-    .setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(11)
-    .setBackground('#f1f3f4').setHorizontalAlignment('center');
-  sheet.setRowHeight(BAL.sugHeaderRow, 38);
-
-  if (sheet.getMaxColumns() > 8) sheet.hideColumns(9, sheet.getMaxColumns() - 8);
-  lockSheet(sheet, 'Balances');
-  sheet.setFrozenRows(2);
-}
-
-/** Writes the four formula-driven cells for one Balances person row. */
-function writeBalancesPersonRow(sheet, row, name, color) {
-  sheet.getRange(row, 1).setValue(name).setBackground(color).setFontFamily(CONFIG.fonts.body).setFontWeight('bold');
-  // Net balance lives in column D; B and C are derived from it.
-  sheet.getRange(row, 4)
-    .setFormula('=IFERROR(SUMIFS(Ledger!$C$3:$C,Ledger!$B$3:$B,$A' + row + ')-SUMIFS(Ledger!$D$3:$D,Ledger!$B$3:$B,$A' + row + '),0)')
-    .setNumberFormat('$#,##0.00').setFontWeight('bold').setHorizontalAlignment('center');
-  sheet.getRange(row, 2).setFormula('=IF($D' + row + '>0,$D' + row + ',0)')
-    .setNumberFormat('$#,##0.00').setHorizontalAlignment('center');
-  sheet.getRange(row, 3).setFormula('=IF($D' + row + '<0,-$D' + row + ',0)')
-    .setNumberFormat('$#,##0.00').setHorizontalAlignment('center');
-  sheet.setRowHeight(row, 35);
-}
+/* Balances is merged into the Dashboard — see createDashboardSheet (left region)
+ * and writeSettlementSuggestions (right region). There is no separate Balances sheet. */
 
 /* ============================================================
  *  SHARED SMALL HELPERS
@@ -746,26 +684,16 @@ function addNewUser(userName) {
     lockSheet(usersSheet, 'Master Users');
     if (wasHidden) usersSheet.hideSheet();
 
-    // --- Dashboard (person table is last → append) ---
+    // --- Dashboard person table (A-E). Row derived from the fixed header so the
+    //     F-H suggestions block can never throw off the placement. ---
     var dash = ss.getSheetByName(CONFIG.sheets.dashboard);
     if (dash) {
       unlockSheet(dash);
-      var dRow = dash.getLastRow() + 1;
+      var dRow = DASH.personHeaderRow + index + 1; // index = count of existing users
       writeDashboardPersonRow(dash, dRow, userName, color);
-      dash.getRange(dRow, 1, 1, 5).setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
-      lockSheet(dash, 'Dashboard');
-    }
-
-    // --- Balances net table (A-D). Row is derived from the fixed header so the
-    //     F-H suggestions block can never throw off the placement. ---
-    var bal = ss.getSheetByName(CONFIG.sheets.balances);
-    if (bal) {
-      unlockSheet(bal);
-      var bRow = BAL.netHeaderRow + index + 1; // index = count of existing users
-      writeBalancesPersonRow(bal, bRow, userName, color);
-      bal.getRange(BAL.netHeaderRow, 1, index + 2, 4)
+      dash.getRange(DASH.personHeaderRow, 1, index + 2, 5)
         .setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
-      lockSheet(bal, 'Balances');
+      lockSheet(dash, 'Dashboard');
     }
 
     updateExpensesConditionalFormatting();
@@ -953,47 +881,47 @@ function computeSettlements(netMap) {
   return res;
 }
 
-/** Regenerates the F-H suggestions block on the Balances sheet. */
+/** Regenerates the F-H suggestions block on the Dashboard sheet. */
 function writeSettlementSuggestions(ss, settlements) {
-  var bal = ss.getSheetByName(CONFIG.sheets.balances);
-  if (!bal) return;
+  var dash = ss.getSheetByName(CONFIG.sheets.dashboard);
+  if (!dash) return;
 
-  unlockSheet(bal);
+  unlockSheet(dash);
 
   // Clear any previous suggestions (generous range; F-H from data row down).
-  bal.getRange(BAL.sugDataRow, BAL.sugFirstCol, 1000, 3).clearContent()
+  dash.getRange(DASH.sugDataRow, DASH.sugFirstCol, 1000, 3).clearContent()
     .setBackground(null).setBorder(false, false, false, false, false, false)
     .setFontWeight('normal').setFontColor('#000000');
   // Un-merge any leftover "all settled" banner from a prior run.
-  try { bal.getRange(BAL.sugDataRow, BAL.sugFirstCol, 1, 3).breakApart(); } catch (e) {}
+  try { dash.getRange(DASH.sugDataRow, DASH.sugFirstCol, 1, 3).breakApart(); } catch (e) {}
 
   if (!settlements || settlements.length === 0) {
-    bal.getRange(BAL.sugDataRow, BAL.sugFirstCol, 1, 3).merge()
+    dash.getRange(DASH.sugDataRow, DASH.sugFirstCol, 1, 3).merge()
       .setValue('🎉 All settled up — no payments needed!')
-      .setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setFontSize(11)
+      .setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setFontSize(10)
       .setBackground(CONFIG.colors.positiveGreen).setFontColor('#1b5e20')
       .setHorizontalAlignment('center').setVerticalAlignment('middle');
-    bal.setRowHeight(BAL.sugDataRow, 36);
-    bal.getRange(BAL.sugHeaderRow, BAL.sugFirstCol, 2, 3)
+    dash.setRowHeight(DASH.sugDataRow, 32);
+    dash.getRange(DASH.sugHeaderRow, DASH.sugFirstCol, 2, 3)
       .setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
-    lockSheet(bal, 'Balances');
+    lockSheet(dash, 'Dashboard');
     return;
   }
 
   var rows = settlements.map(function (s) { return [s.from, '→  ' + s.to, s.amount]; });
-  bal.getRange(BAL.sugDataRow, BAL.sugFirstCol, rows.length, 3).setValues(rows);
-  bal.getRange(BAL.sugDataRow, BAL.sugFirstCol, rows.length, 1)
-    .setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setBackground(CONFIG.colors.negativeRed).setHorizontalAlignment('center');
-  bal.getRange(BAL.sugDataRow, BAL.sugFirstCol + 1, rows.length, 1)
-    .setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setBackground(CONFIG.colors.positiveGreen).setHorizontalAlignment('center');
-  bal.getRange(BAL.sugDataRow, BAL.sugFirstCol + 2, rows.length, 1)
-    .setFontFamily(CONFIG.fonts.body).setFontWeight('bold').setNumberFormat('$#,##0.00').setHorizontalAlignment('center');
-  for (var r = 0; r < rows.length; r++) bal.setRowHeight(BAL.sugDataRow + r, 34);
+  dash.getRange(DASH.sugDataRow, DASH.sugFirstCol, rows.length, 3).setValues(rows);
+  dash.getRange(DASH.sugDataRow, DASH.sugFirstCol, rows.length, 1)
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontWeight('bold').setBackground(CONFIG.colors.negativeRed).setHorizontalAlignment('center');
+  dash.getRange(DASH.sugDataRow, DASH.sugFirstCol + 1, rows.length, 1)
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontWeight('bold').setBackground(CONFIG.colors.positiveGreen).setHorizontalAlignment('center');
+  dash.getRange(DASH.sugDataRow, DASH.sugFirstCol + 2, rows.length, 1)
+    .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontWeight('bold').setNumberFormat('$#,##0.00').setHorizontalAlignment('center');
+  for (var r = 0; r < rows.length; r++) dash.setRowHeight(DASH.sugDataRow + r, 30);
 
-  bal.getRange(BAL.sugHeaderRow, BAL.sugFirstCol, rows.length + 1, 3)
+  dash.getRange(DASH.sugHeaderRow, DASH.sugFirstCol, rows.length + 1, 3)
     .setBorder(true, true, true, true, true, true, CONFIG.colors.borderColor, SpreadsheetApp.BorderStyle.SOLID);
 
-  lockSheet(bal, 'Balances');
+  lockSheet(dash, 'Dashboard');
 }
 
 function refreshBalances() {

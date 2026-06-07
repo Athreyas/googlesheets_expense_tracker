@@ -31,7 +31,8 @@ var CONFIG = {
     expenses: 'Expenses',
     users: 'Master Users',
     ledger: 'Ledger',
-    archives: 'Archives'
+    archives: 'Archives',
+    recurring: 'Recurring'
   },
   fonts: {
     header: 'Product Sans',
@@ -52,8 +53,10 @@ function onOpen() {
     .addSeparator()
     .addItem('➕ Add Expense', 'showAddExpenseDialog')
     .addItem('💳 Add Settlement', 'showAddSettlementDialog')
+    .addItem('🔁 Add Recurring Expense', 'showAddRecurringDialog')
     .addSeparator()
     .addItem('🔄 Refresh Balances', 'refreshBalancesWithUI')
+    .addItem('▶️ Post Due Recurring Now', 'postRecurringNow')
     .addItem('📦 Archive Old Expenses', 'showArchiveDialog')
     .addSeparator()
     .addItem('❓ Help', 'showHelp')
@@ -115,6 +118,12 @@ function showArchiveDialog() {
   SpreadsheetApp.getUi().showModalDialog(html, '📦 Archive Expenses');
 }
 
+function showAddRecurringDialog() {
+  if (!isSetupComplete()) { SpreadsheetApp.getUi().alert('Please complete setup first.'); return; }
+  var html = HtmlService.createHtmlOutputFromFile('AddRecurringDialog').setWidth(600).setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '🔁 Add Recurring Expense');
+}
+
 function showHelp() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aboutSheet = ss.getSheetByName(CONFIG.sheets.about);
@@ -146,6 +155,7 @@ function processSetup(users) {
     createExpensesSheet(userArray);
     createLedgerSheet();
     createArchivesSheet();
+    createRecurringSheet();
     createDashboardSheet(userArray);
 
     var tempSheet = ss.getSheetByName('Temp');
@@ -153,6 +163,7 @@ function processSetup(users) {
 
     reorderSheets();
     rebuildLedger(); // empty to start, but establishes a clean state
+    ensureRecurringTrigger(); // daily auto-post of due recurring expenses
 
     ss.setActiveSheet(ss.getSheetByName(CONFIG.sheets.dashboard));
     return { success: true, message: '✅ Setup completed successfully!' };
@@ -436,13 +447,41 @@ function createArchivesSheet() {
 }
 
 /**
- * DASHBOARD — the single overview sheet (the old Balances tab is merged in).
- *   Top: a compact KPI band (four cards).
- *   Left region (A–E): spending + net balance per person — all live formulas.
- *   Right region (F–H): suggested settlements — regenerated on every rebuild.
- * Both tables are the last thing in their columns, so adding a user just
- * appends a row with nothing below to overwrite.
+ * RECURRING (hidden) — saved templates for fixed-amount monthly expenses.
+ * Columns: Description | Amount | Paid By | Split Type | Split Details |
+ *          Category | Day | Start Date | End Date | Last Posted (YYYY-MM) | Active
+ * A daily trigger (postDueRecurring) posts any item due today.
  */
+function createRecurringSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var existing = ss.getSheetByName(CONFIG.sheets.recurring);
+  if (existing) ss.deleteSheet(existing);
+
+  var sheet = ss.insertSheet(CONFIG.sheets.recurring);
+  sheet.getRange('A1:K1').merge().setValue('🔁 RECURRING EXPENSES (auto-posted monthly — manage via the menu)')
+    .setFontFamily(CONFIG.fonts.header).setFontSize(14).setFontWeight('bold')
+    .setBackground('#00897b').setFontColor('#ffffff').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 40);
+
+  sheet.getRange(2, 1, 1, 11).setValues([[
+    'Description', 'Amount', 'Paid By', 'Split Type', 'Split Details',
+    'Category', 'Day', 'Start Date', 'End Date', 'Last Posted', 'Active'
+  ]]).setFontFamily(CONFIG.fonts.header).setFontWeight('bold').setFontSize(10)
+    .setBackground('#b2dfdb').setHorizontalAlignment('center');
+  sheet.setRowHeight(2, 32);
+
+  sheet.setColumnWidth(1, 220); sheet.setColumnWidth(2, 100); sheet.setColumnWidth(3, 140);
+  sheet.setColumnWidth(4, 110); sheet.setColumnWidth(5, 320); sheet.setColumnWidth(6, 120);
+  sheet.setColumnWidth(7, 60);  sheet.setColumnWidth(8, 110); sheet.setColumnWidth(9, 110);
+  sheet.setColumnWidth(10, 100); sheet.setColumnWidth(11, 80);
+  sheet.getRange('B3:B').setNumberFormat('$#,##0.00');
+  sheet.getRange('H3:I').setNumberFormat('mmm dd, yyyy');
+  sheet.getRange('J3:J').setNumberFormat('@'); // Last Posted stays text "YYYY-MM"
+
+  lockSheet(sheet, 'Recurring');
+  sheet.setFrozenRows(2);
+  sheet.hideSheet();
+}
 var DASH = {
   personHeaderRow: 10, // "Person | Total Spent | # Transactions | Net Balance | Status"
   personDataRow: 11,
@@ -1032,8 +1071,166 @@ function archiveExpenses(beforeDate) {
 }
 
 /* ============================================================
- *  UTILITIES
+ *  RECURRING EXPENSES  (fixed amount, monthly, auto-posted)
  * ============================================================ */
+
+/**
+ * Saves a recurring template. Called from the Add Recurring dialog.
+ * data = { description, amount, paidBy, splitType, splitDetails, category,
+ *          startDate (yyyy-mm-dd), endDate (yyyy-mm-dd or '') }
+ * The day-of-month is taken from startDate. If startDate is today or earlier,
+ * the first occurrence is posted immediately; the daily trigger handles the rest.
+ */
+function addRecurring(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(CONFIG.sheets.recurring);
+    if (!sheet) { createRecurringSheet(); sheet = ss.getSheetByName(CONFIG.sheets.recurring); }
+
+    var start = parseLocalDate(data.startDate);
+    var end = data.endDate ? parseLocalDate(data.endDate) : '';
+    if (end && end < start) return { success: false, message: '❌ End date must be on or after the start date.' };
+
+    var day = start.getDate();
+    var newRow = Math.max(sheet.getLastRow(), 2) + 1;
+    var today = stripTime(new Date());
+
+    // Post the first occurrence now if the start date has arrived.
+    var lastPosted = '';
+    if (stripTime(start) <= today) {
+      addExpense({
+        description: data.description, amount: data.amount, paidBy: data.paidBy,
+        date: data.startDate, category: data.category,
+        splitType: data.splitType, splitDetails: data.splitDetails
+      });
+      lastPosted = ym(start);
+    }
+
+    var wasHidden = sheet.isSheetHidden();
+    if (wasHidden) sheet.showSheet();
+    unlockSheet(sheet);
+    sheet.getRange(newRow, 1, 1, 11).setValues([[
+      data.description, parseFloat(data.amount), data.paidBy, data.splitType, data.splitDetails,
+      data.category || 'General', day, start, (end || ''), lastPosted, true
+    ]]);
+    sheet.getRange(newRow, 2).setNumberFormat('$#,##0.00');
+    sheet.getRange(newRow, 8, 1, 2).setNumberFormat('mmm dd, yyyy');
+    lockSheet(sheet, 'Recurring');
+    if (wasHidden) sheet.hideSheet();
+
+    ensureRecurringTrigger();
+
+    var firstNote = lastPosted ? ' The first one was added now;' : '';
+    return { success: true, message: '✅ Recurring "' + data.description + '" saved.' + firstNote + ' it will post on day ' + day + ' each month.' };
+  } catch (error) {
+    return { success: false, message: '❌ Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Trigger handler / manual action — posts every recurring occurrence whose
+ * monthly date has arrived but hasn't been posted yet, catching up any months
+ * missed since the last post. Idempotent: each month posts at most once.
+ */
+function postDueRecurring() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.sheets.recurring);
+  if (!sheet) return 0;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 3) return 0;
+
+  var today = stripTime(new Date());
+  var tz = Session.getScriptTimeZone();
+  var posted = 0;
+
+  var data = sheet.getRange(3, 1, lastRow - 2, 11).getValues();
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    var description = row[0], amount = row[1], paidBy = row[2], splitType = row[3];
+    var splitDetails = row[4], category = row[5], day = parseInt(row[6], 10);
+    var start = row[7] ? stripTime(new Date(row[7])) : null;
+    var end = row[8] ? stripTime(new Date(row[8])) : null;
+    var active = row[10];
+
+    if (active !== true && String(active).toUpperCase() !== 'TRUE') continue;
+    if (!amount || !day || !start) continue;
+
+    // First month to consider: the month AFTER the last posted month, or the
+    // start month if nothing has posted yet.
+    var lastYM = coerceYM(row[9]);
+    var cursor;
+    if (lastYM) {
+      var p = lastYM.split('-');
+      cursor = new Date(parseInt(p[0], 10), parseInt(p[1], 10), 1); // 1-based month → next month index
+    } else {
+      cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    }
+
+    var newLastYM = lastYM;
+    var guard = 0;
+    while (guard++ < 240) {
+      var y = cursor.getFullYear(), m = cursor.getMonth();
+      var occDay = Math.min(day, daysInMonth(new Date(y, m, 1)));
+      var occDate = new Date(y, m, occDay);
+      if (occDate > today) break;        // this month's date hasn't arrived yet
+      if (end && occDate > end) break;   // past the end date — stop
+      if (occDate >= start) {
+        addExpense({
+          description: description, amount: amount, paidBy: paidBy,
+          date: Utilities.formatDate(occDate, tz, 'yyyy-MM-dd'),
+          category: category, splitType: splitType, splitDetails: splitDetails
+        });
+        newLastYM = ym(occDate);
+        posted++;
+      }
+      cursor = new Date(y, m + 1, 1);    // advance one month
+    }
+
+    if (newLastYM && newLastYM !== lastYM) {
+      var wasHidden = sheet.isSheetHidden();
+      if (wasHidden) sheet.showSheet();
+      unlockSheet(sheet);
+      var cell = sheet.getRange(i + 3, 10);
+      cell.setNumberFormat('@'); // keep YYYY-MM as text, never a date
+      cell.setValue(newLastYM);
+      lockSheet(sheet, 'Recurring');
+      if (wasHidden) sheet.hideSheet();
+    }
+  }
+  return posted;
+}
+
+/** Coerce a Last-Posted cell (text 'YYYY-MM' or a date) into a 'YYYY-MM' string. */
+function coerceYM(v) {
+  if (!v && v !== 0) return '';
+  if (v instanceof Date) return ym(v);
+  var s = String(v).trim();
+  var match = s.match(/^(\d{4})-(\d{1,2})/);
+  if (match) { var mm = parseInt(match[2], 10); return match[1] + '-' + (mm < 10 ? '0' + mm : mm); }
+  return s;
+}
+
+/** Manual menu action: catch up all due recurring expenses now and report. */
+function postRecurringNow() {
+  ensureRecurringTrigger(); // also (re)install the daily auto-poster if it's missing
+  var n = postDueRecurring();
+  SpreadsheetApp.getUi().alert(n > 0
+    ? '✅ Posted ' + n + ' recurring expense(s), including any missed months.'
+    : 'Nothing to post — all recurring expenses are already up to date through today.');
+}
+
+/** Ensures exactly one daily trigger for postDueRecurring exists. */
+function ensureRecurringTrigger() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === 'postDueRecurring') return; // already installed
+    }
+    ScriptApp.newTrigger('postDueRecurring').timeBased().everyDays(1).atHour(6).create();
+  } catch (e) {
+    Logger.log('Could not install recurring trigger: ' + e);
+  }
+}
 
 /** Parse a yyyy-mm-dd string into a LOCAL date (avoids UTC off-by-one). */
 function parseLocalDate(value) {
@@ -1046,4 +1243,20 @@ function parseLocalDate(value) {
 
 function roundMoney(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Midnight-normalized copy of a date (for day-level comparisons). */
+function stripTime(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** Number of days in the month of the given date. */
+function daysInMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
+/** "YYYY-MM" stamp for a date (used to prevent double-posting per month). */
+function ym(d) {
+  var m = d.getMonth() + 1;
+  return d.getFullYear() + '-' + (m < 10 ? '0' + m : m);
 }

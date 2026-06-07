@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #1a73e8;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #202124;
+            font-size: 14px;
+        }
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+        }
+        .settlement-visual {
+            background-color: #e8f0fe;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+            font-size: 16px;
+            color: #1a73e8;
+            font-weight: 500;
+        }
+        .arrow {
+            font-size: 24px;
+            margin: 0 10px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1557b0;
+        }
+        .btn-secondary {
+            background-color: #f1f3f4;
+            color: #202124;
+        }
+        .btn-secondary:hover {
+            background-color: #e8eaed;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+        .info-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>💳 Record Settlement</h2>
+        
+        <div class="info-box">
+            💡 Use this to record when someone pays back money they owe.
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <form id="settlementForm">
+            <div class="form-group">
+                <label for="from">Who Paid *</label>
+                <select id="from" onchange="updateVisual()" required>
+                    <option value="">-- Select person --</option>
+                </select>
+            </div>
+            
+            <div class="settlement-visual" id="visual">
+                <span id="fromName">Person A</span>
+                <span class="arrow">→</span>
+                <span id="toName">Person B</span>
+                <br>
+                <span style="font-size: 14px; color: #5f6368;">paid</span>
+                <span id="amountDisplay" style="font-size: 20px; font-weight: bold;">$0.00</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="to">Who Received Payment *</label>
+                <select id="to" onchange="updateVisual()" required>
+                    <option value="">-- Select person --</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="amount">Amount *</label>
+                <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" oninput="updateVisual()" required>
+                <div class="helper-text">Enter the amount that was paid</div>
+            </div>
+            
+            <div class="button-container">
+                <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+                <button type="submit" class="btn-primary" id="submitBtn">Record Settlement</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        var allUsers = [];
+        
+        // Initialize
+        google.script.run
+            .withSuccessHandler(function(users) {
+                allUsers = users;
+                populateUsers();
+            })
+            .getAllUsers();
+        
+        function populateUsers() {
+            var fromSelect = document.getElementById('from');
+            var toSelect = document.getElementById('to');
+            
+            allUsers.forEach(function(user) {
+                var option1 = document.createElement('option');
+                option1.value = user;
+                option1.textContent = user;
+                fromSelect.appendChild(option1);
+                
+                var option2 = document.createElement('option');
+                option2.value = user;
+                option2.textContent = user;
+                toSelect.appendChild(option2);
+            });
+        }
+        
+        function updateVisual() {
+            var from = document.getElementById('from').value || 'Person A';
+            var to = document.getElementById('to').value || 'Person B';
+            var amount = parseFloat(document.getElementById('amount').value) || 0;
+            
+            document.getElementById('fromName').textContent = from;
+            document.getElementById('toName').textContent = to;
+            document.getElementById('amountDisplay').textContent = '$' + amount.toFixed(2);
+        }
+        
+        document.getElementById('settlementForm').onsubmit = function(e) {
+            e.preventDefault();
+            submitSettlement();
+        };
+        
+        function submitSettlement() {
+            var from = document.getElementById('from').value;
+            var to = document.getElementById('to').value;
+            var amount = document.getElementById('amount').value;
+            
+            // Validation
+            if (!from || !to || !amount) {
+                showMessage('Please fill in all fields.', 'error');
+                return;
+            }
+            
+            if (from === to) {
+                showMessage('The payer and receiver cannot be the same person.', 'error');
+                return;
+            }
+            
+            if (parseFloat(amount) <= 0) {
+                showMessage('Amount must be greater than 0.', 'error');
+                return;
+            }
+            
+            var settlementData = {
+                from: from,
+                to: to,
+                amount: amount
+            };
+            
+            // Disable submit button
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Recording...';
+            
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(onFailure)
+                .addSettlement(settlementData);
+        }
+        
+        function onSuccess(result) {
+            var submitBtn = document.getElementById('submitBtn');
+            
+            if (result.success) {
+                showMessage(result.message, 'success');
+                setTimeout(function() {
+                    google.script.host.close();
+                }, 1500);
+            } else {
+                showMessage(result.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Record Settlement';
+            }
+        }
+        
+        function onFailure(error) {
+            showMessage('Error: ' + error.message, 'error');
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Record Settlement';
+        }
+        
+        function showMessage(msg, type) {
+            var messageDiv = document.getElementById('message');
+            messageDiv.textContent = msg;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

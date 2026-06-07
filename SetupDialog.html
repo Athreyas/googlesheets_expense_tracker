@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #1a73e8;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #202124;
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 5px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1557b0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .btn-secondary {
+            background-color: #f1f3f4;
+            color: #202124;
+        }
+        .btn-secondary:hover {
+            background-color: #e8eaed;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .example {
+            background-color: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        .example strong {
+            color: #1a73e8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔧 Setup Expense Tracker</h2>
+        
+        <div style="background-color: #fff3cd; border: 2px solid #ffc107; padding: 12px; border-radius: 4px; margin-bottom: 15px;">
+            <strong>⚠️ Warning:</strong> If you've already set up the tracker, running this again will <strong>DELETE ALL DATA</strong> (expenses, settlements, balances).
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <div class="form-group">
+            <label for="users">Enter Participant Names</label>
+            <textarea id="users" placeholder="John Doe&#10;Jane Smith&#10;Bob Johnson&#10;Alice Williams"></textarea>
+            <div class="helper-text">
+                Enter one name per line. These will be all the people sharing expenses.
+            </div>
+        </div>
+        
+        <div class="example">
+            <strong>Example:</strong><br>
+            Sarah Connor<br>
+            Kyle Reese<br>
+            John Connor
+        </div>
+        
+        <div class="button-container">
+            <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+            <button type="button" class="btn-primary" id="submitBtn" onclick="submitSetup()">Setup</button>
+        </div>
+    </div>
+
+    <script>
+        function submitSetup() {
+            var users = document.getElementById('users').value.trim();
+            var messageDiv = document.getElementById('message');
+            var submitBtn = document.getElementById('submitBtn');
+            
+            // Validation
+            if (!users) {
+                showMessage('Please enter at least one participant name.', 'error');
+                return;
+            }
+            
+            var userArray = users.split('\n').filter(function(u) { return u.trim() !== ''; });
+            if (userArray.length < 2) {
+                showMessage('Please enter at least 2 participants.', 'error');
+                return;
+            }
+            
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Setting up...';
+            
+            // Call Apps Script function
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(onFailure)
+                .processSetup(users);
+        }
+        
+        function onSuccess(result) {
+            var submitBtn = document.getElementById('submitBtn');
+            
+            if (result.success) {
+                showMessage(result.message, 'success');
+                setTimeout(function() {
+                    google.script.host.close();
+                }, 1500);
+            } else {
+                showMessage(result.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Setup';
+            }
+        }
+        
+        function onFailure(error) {
+            showMessage('Error: ' + error.message, 'error');
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Setup';
+        }
+        
+        function showMessage(msg, type) {
+            var messageDiv = document.getElementById('message');
+            messageDiv.textContent = msg;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

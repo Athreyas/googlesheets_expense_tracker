@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #1a73e8;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #202124;
+            font-size: 14px;
+        }
+        input[type="date"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+        }
+        .button-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #ea4335;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #c5221f;
+        }
+        .btn-secondary {
+            background-color: #f1f3f4;
+            color: #202124;
+        }
+        .btn-secondary:hover {
+            background-color: #e8eaed;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #5f6368;
+            margin-top: 4px;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .quick-select {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .quick-btn {
+            padding: 6px 12px;
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border: 1px solid #1a73e8;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .quick-btn:hover {
+            background-color: #d2e3fc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📦 Archive Expenses</h2>
+        
+        <div class="warning-box">
+            ⚠️ This will move expenses older than the selected date to the Archives sheet.
+        </div>
+        
+        <div id="message" class="message"></div>
+        
+        <form id="archiveForm">
+            <div class="form-group">
+                <label for="beforeDate">Archive expenses before *</label>
+                <input type="date" id="beforeDate" required>
+                <div class="helper-text">All expenses before this date will be archived</div>
+                
+                <div class="quick-select">
+                    <button type="button" class="quick-btn" onclick="setDateOffset(30)">Last Month</button>
+                    <button type="button" class="quick-btn" onclick="setDateOffset(90)">3 Months Ago</button>
+                    <button type="button" class="quick-btn" onclick="setDateOffset(180)">6 Months Ago</button>
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+                <button type="submit" class="btn-primary" id="submitBtn">Archive</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Set default to 30 days ago
+        setDateOffset(30);
+        
+        function setDateOffset(days) {
+            var date = new Date();
+            date.setDate(date.getDate() - days);
+            document.getElementById('beforeDate').valueAsDate = date;
+        }
+        
+        document.getElementById('archiveForm').onsubmit = function(e) {
+            e.preventDefault();
+            submitArchive();
+        };
+        
+        function submitArchive() {
+            var beforeDate = document.getElementById('beforeDate').value;
+            
+            if (!beforeDate) {
+                showMessage('Please select a date.', 'error');
+                return;
+            }
+            
+            // Confirm action
+            var confirmed = confirm('Are you sure you want to archive all expenses before ' + beforeDate + '? This action will move them to the Archives sheet.');
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // Disable submit button
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Archiving...';
+            
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(onFailure)
+                .archiveExpenses(beforeDate);
+        }
+        
+        function onSuccess(result) {
+            var submitBtn = document.getElementById('submitBtn');
+            
+            if (result.success) {
+                showMessage(result.message, 'success');
+                setTimeout(function() {
+                    google.script.host.close();
+                }, 2000);
+            } else {
+                showMessage(result.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Archive';
+            }
+        }
+        
+        function onFailure(error) {
+            showMessage('Error: ' + error.message, 'error');
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Archive';
+        }
+        
+        function showMessage(msg, type) {
+            var messageDiv = document.getElementById('message');
+            messageDiv.textContent = msg;
+            messageDiv.className = 'message ' + type;
+            messageDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

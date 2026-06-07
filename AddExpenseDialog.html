@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body {
+            font-family: 'Google Sans', Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 550px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #1a73e8;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #202124;
+            font-size: 14px;
+        }
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+        }
+        .checkbox-group {
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            padding: 12px;
+            max-height: 140px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+        }
+        .checkbox-item {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .checkbox-item:last-child { margin-bottom: 0; }
+        .checkbox-item input { margin-right: 8px; }
+        .checkbox-item label {
+            display: inline;
+            margin-bottom: 0;
+            font-weight: 400;
+        }
+        .payer-tag {
+            margin-left: 8px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #1a73e8;
+            background: #e8f0fe;
+            border-radius: 10px;
+            padding: 1px 8px;
+        }
+        .split-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .mini-btn {
+            padding: 4px 10px;
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border: 1px solid #1a73e8;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .mini-btn:hover { background-color: #d2e3fc; }
+        .split-details {
+            display: none;
+            margin-top: 10px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .split-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .split-input-group label { margin: 0; min-width: 130px; }
+        .split-input-group input { flex: 1; }
+        .hint {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #1a73e8;
+            font-weight: 500;
+            text-align: center;
+            background: #e8f0fe;
+            border-radius: 4px;
+            padding: 8px;
+        }
+        .hint.warn { color: #b06000; background: #fef7e0; }
+        .button-container {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 25px;
+        }
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background-color: #1a73e8; color: white; }
+        .btn-primary:hover { background-color: #1557b0; }
+        .btn-secondary { background-color: #f1f3f4; color: #202124; }
+        .btn-secondary:hover { background-color: #e8eaed; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message.success { background-color: #d4edda; color: #155724; }
+        .message.error { background-color: #f8d7da; color: #721c24; }
+        .helper-text { font-size: 12px; color: #5f6368; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>➕ Add New Expense</h2>
+
+        <div id="message" class="message"></div>
+
+        <form id="expenseForm">
+            <!-- 1. Date -->
+            <div class="form-group">
+                <label for="date">Date *</label>
+                <input type="date" id="date" required>
+            </div>
+
+            <!-- 2. Category -->
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category">
+                    <option value="Food">Food &amp; Dining</option>
+                    <option value="Groceries">Groceries</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Rent">Rent</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <!-- 3. Description -->
+            <div class="form-group">
+                <label for="description">Description *</label>
+                <input type="text" id="description" placeholder="e.g., Groceries, Dinner, Uber" required>
+            </div>
+
+            <!-- 4. Amount -->
+            <div class="form-group">
+                <label for="amount">Amount *</label>
+                <input type="number" id="amount" step="0.01" min="0.01" placeholder="0.00" oninput="refreshSplitArea()" required>
+            </div>
+
+            <!-- 5. Split Type -->
+            <div class="form-group">
+                <label for="splitType">Split Type *</label>
+                <select id="splitType" onchange="refreshSplitArea()" required>
+                    <option value="Equal" selected>Equal - Split equally among selected people</option>
+                    <option value="Exact">Exact - Specify exact amounts</option>
+                    <option value="Percentage">Percentage - Split by percentages</option>
+                    <option value="Shares">Shares - Split by shares/ratios</option>
+                </select>
+            </div>
+
+            <!-- 6. Paid By -->
+            <div class="form-group">
+                <label for="paidBy">Paid By *</label>
+                <select id="paidBy" onchange="handlePaidByChange()" required>
+                    <option value="">-- Select who paid --</option>
+                </select>
+                <div class="helper-text">The payer is automatically included in "Split Among" below.</div>
+            </div>
+
+            <!-- 7. Split Among -->
+            <div class="form-group">
+                <label>Split Among *</label>
+                <div class="split-toolbar">
+                    <button type="button" class="mini-btn" onclick="selectAllParticipants(true)">Select all</button>
+                    <button type="button" class="mini-btn" onclick="selectAllParticipants(false)">Clear</button>
+                </div>
+                <div class="checkbox-group" id="participantsCheckboxes"></div>
+                <div id="splitDetailsContainer" class="split-details"></div>
+                <div id="splitHint" class="hint" style="display:none;"></div>
+            </div>
+
+            <div class="button-container">
+                <button type="button" class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+                <button type="submit" class="btn-primary" id="submitBtn">Add Expense</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        var allUsers = [];
+
+        // Default the date to today.
+        document.getElementById('date').valueAsDate = new Date();
+
+        // Load users, then build the UI with Splitwise-style defaults.
+        google.script.run
+            .withSuccessHandler(function (users) {
+                allUsers = users || [];
+                populateUsers();
+            })
+            .getAllUsers();
+
+        function cbId(user) { return 'user_' + user.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+        function populateUsers() {
+            var paidBySelect = document.getElementById('paidBy');
+            var box = document.getElementById('participantsCheckboxes');
+            paidBySelect.innerHTML = '<option value="">-- Select who paid --</option>';
+            box.innerHTML = '';
+
+            allUsers.forEach(function (user) {
+                var opt = document.createElement('option');
+                opt.value = user;
+                opt.textContent = user;
+                paidBySelect.appendChild(opt);
+
+                var div = document.createElement('div');
+                div.className = 'checkbox-item';
+
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.id = cbId(user);
+                cb.value = user;
+                cb.checked = true; // DEFAULT: split equally among everyone
+                cb.onchange = refreshSplitArea;
+
+                var lbl = document.createElement('label');
+                lbl.htmlFor = cb.id;
+                lbl.textContent = user;
+
+                var tag = document.createElement('span');
+                tag.className = 'payer-tag';
+                tag.id = 'payertag_' + cbId(user);
+                tag.textContent = 'payer';
+                tag.style.display = 'none';
+
+                div.appendChild(cb);
+                div.appendChild(lbl);
+                div.appendChild(tag);
+                box.appendChild(div);
+            });
+
+            // DEFAULT: "paid by" the first person (acts like "you").
+            if (allUsers.length > 0) {
+                paidBySelect.value = allUsers[0];
+                handlePaidByChange();
+            } else {
+                refreshSplitArea();
+            }
+        }
+
+        // When the payer changes, make sure they're checked in Split Among
+        // and show a small "payer" tag next to their name.
+        function handlePaidByChange() {
+            var payer = document.getElementById('paidBy').value;
+            allUsers.forEach(function (user) {
+                var tag = document.getElementById('payertag_' + cbId(user));
+                if (tag) tag.style.display = (user === payer) ? 'inline' : 'none';
+            });
+            if (payer) {
+                var cb = document.getElementById(cbId(payer));
+                if (cb) cb.checked = true;
+            }
+            refreshSplitArea();
+        }
+
+        function selectAllParticipants(state) {
+            allUsers.forEach(function (user) {
+                var cb = document.getElementById(cbId(user));
+                if (cb) cb.checked = state;
+            });
+            // Keep the payer included even after "Clear".
+            if (!state) {
+                var payer = document.getElementById('paidBy').value;
+                if (payer) { var pcb = document.getElementById(cbId(payer)); if (pcb) pcb.checked = true; }
+            }
+            refreshSplitArea();
+        }
+
+        function getSelectedParticipants() {
+            var selected = [];
+            allUsers.forEach(function (user) {
+                var cb = document.getElementById(cbId(user));
+                if (cb && cb.checked) selected.push(user);
+            });
+            return selected;
+        }
+
+        // Rebuilds the dynamic split inputs (for non-equal types) and the hint.
+        function refreshSplitArea() {
+            var splitType = document.getElementById('splitType').value;
+            var container = document.getElementById('splitDetailsContainer');
+            var hint = document.getElementById('splitHint');
+            var selected = getSelectedParticipants();
+            var amount = parseFloat(document.getElementById('amount').value) || 0;
+
+            container.innerHTML = '';
+            container.style.display = 'none';
+            hint.style.display = 'none';
+            hint.className = 'hint';
+
+            if (selected.length === 0) {
+                hint.textContent = 'Select at least one person to split among.';
+                hint.className = 'hint warn';
+                hint.style.display = 'block';
+                return;
+            }
+
+            if (splitType === 'Equal') {
+                var per = amount / selected.length;
+                hint.textContent = '$' + per.toFixed(2) + ' / person  (' + selected.length + ' ' + (selected.length === 1 ? 'person' : 'people') + ')';
+                hint.style.display = 'block';
+                return;
+            }
+
+            // Exact / Percentage / Shares -> show one input per selected person.
+            container.style.display = 'block';
+            selected.forEach(function (user) {
+                var group = document.createElement('div');
+                group.className = 'split-input-group';
+
+                var lbl = document.createElement('label');
+                lbl.textContent = user + ':';
+
+                var input = document.createElement('input');
+                input.type = 'number';
+                input.step = '0.01';
+                input.min = '0';
+                input.id = 'split_' + cbId(user);
+                input.className = 'split-input';
+                input.oninput = updateSplitHint;
+
+                if (splitType === 'Exact') {
+                    input.placeholder = '$0.00';
+                    if (amount > 0) input.value = (amount / selected.length).toFixed(2);
+                } else if (splitType === 'Percentage') {
+                    input.placeholder = '%';
+                    input.value = (100 / selected.length).toFixed(1);
+                } else if (splitType === 'Shares') {
+                    input.placeholder = 'shares';
+                    input.value = '1';
+                }
+
+                group.appendChild(lbl);
+                group.appendChild(input);
+                container.appendChild(group);
+            });
+
+            updateSplitHint();
+        }
+
+        // Live running-total hint for Exact / Percentage / Shares.
+        function updateSplitHint() {
+            var splitType = document.getElementById('splitType').value;
+            var hint = document.getElementById('splitHint');
+            var selected = getSelectedParticipants();
+            var amount = parseFloat(document.getElementById('amount').value) || 0;
+            if (splitType === 'Equal' || selected.length === 0) return;
+
+            var total = 0;
+            selected.forEach(function (user) {
+                var el = document.getElementById('split_' + cbId(user));
+                total += parseFloat(el && el.value) || 0;
+            });
+
+            hint.style.display = 'block';
+            if (splitType === 'Exact') {
+                var diff = amount - total;
+                hint.textContent = 'Entered $' + total.toFixed(2) + ' of $' + amount.toFixed(2) +
+                    (Math.abs(diff) < 0.01 ? '  \u2713' : '  (remaining $' + diff.toFixed(2) + ')');
+                hint.className = Math.abs(diff) < 0.01 ? 'hint' : 'hint warn';
+            } else if (splitType === 'Percentage') {
+                hint.textContent = 'Total ' + total.toFixed(1) + '%' + (Math.abs(total - 100) < 0.05 ? '  \u2713' : '  (must equal 100%)');
+                hint.className = Math.abs(total - 100) < 0.05 ? 'hint' : 'hint warn';
+            } else if (splitType === 'Shares') {
+                hint.textContent = total + ' shares total' + (amount > 0 && total > 0 ? '  ($' + (amount / total).toFixed(2) + ' per share)' : '');
+                hint.className = 'hint';
+            }
+        }
+
+        document.getElementById('expenseForm').onsubmit = function (e) {
+            e.preventDefault();
+            submitExpense();
+        };
+
+        function submitExpense() {
+            var description = document.getElementById('description').value.trim();
+            var amount = document.getElementById('amount').value;
+            var paidBy = document.getElementById('paidBy').value;
+            var date = document.getElementById('date').value;
+            var category = document.getElementById('category').value;
+            var splitType = document.getElementById('splitType').value;
+            var selected = getSelectedParticipants();
+
+            if (!date || !description || !amount || !paidBy) {
+                showMessage('Please fill in all required fields.', 'error');
+                return;
+            }
+            if (selected.length === 0) {
+                showMessage('Please select at least one participant.', 'error');
+                return;
+            }
+
+            var splitDetails = '';
+            if (splitType === 'Equal') {
+                splitDetails = 'Split equally among [' + selected.join(', ') + ']';
+            } else {
+                var splits = [];
+                var valid = true;
+                selected.forEach(function (user) {
+                    var el = document.getElementById('split_' + cbId(user));
+                    var value = el ? el.value : '';
+                    if (!value || parseFloat(value) <= 0) valid = false;
+                    if (splitType === 'Exact') splits.push(user + ': $' + value);
+                    else if (splitType === 'Percentage') splits.push(user + ': ' + value + '%');
+                    else if (splitType === 'Shares') splits.push(user + ': ' + value + ' shares');
+                });
+                if (!valid) {
+                    showMessage('Please enter valid split values for all participants.', 'error');
+                    return;
+                }
+                splitDetails = splits.join(', ');
+
+                if (splitType === 'Exact') {
+                    var sum = 0;
+                    selected.forEach(function (user) { sum += parseFloat(document.getElementById('split_' + cbId(user)).value); });
+                    if (Math.abs(sum - parseFloat(amount)) > 0.01) {
+                        showMessage('Exact amounts must add up to $' + parseFloat(amount).toFixed(2) + '. Current total: $' + sum.toFixed(2), 'error');
+                        return;
+                    }
+                } else if (splitType === 'Percentage') {
+                    var total = 0;
+                    selected.forEach(function (user) { total += parseFloat(document.getElementById('split_' + cbId(user)).value); });
+                    if (Math.abs(total - 100) > 0.01) {
+                        showMessage('Percentages must sum to 100%. Current total: ' + total.toFixed(1) + '%', 'error');
+                        return;
+                    }
+                }
+            }
+
+            var expenseData = {
+                description: description,
+                amount: amount,
+                paidBy: paidBy,
+                date: date,
+                category: category,
+                splitType: splitType,
+                splitDetails: splitDetails
+            };
+
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Adding...';
+
+            google.script.run
+                .withSuccessHandler(onSuccess)
+                .withFailureHandler(onFailure)
+                .addExpense(expenseData);
+        }
+
+        function onSuccess(result) {
+            var submitBtn = document.getElementById('submitBtn');
+            if (result.success) {
+                showMessage(result.message, 'success');
+                setTimeout(function () { google.script.host.close(); }, 1200);
+            } else {
+                showMessage(result.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Add Expense';
+            }
+        }
+
+        function onFailure(error) {
+            showMessage('Error: ' + error.message, 'error');
+            var submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Add Expense';
+        }
+
+        function showMessage(msg, type) {
+            var m = document.getElementById('message');
+            m.textContent = msg;
+            m.className = 'message ' + type;
+            m.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
-# 💰 Expense Tracker
+# 💰 SplitSheet
 
-A lightweight, Splitwise-style shared-expense tracker built in Google Sheets with Apps Script.
-Track who paid, split bills fairly, and see who owes whom — with a one-click plan for the
-fewest payments needed to settle everyone up.
+**Splitwise, but it's a Google Sheet.** A lightweight shared-expense tracker built in Google Sheets
+with Apps Script. Track who paid, split bills fairly, and see who owes whom — with a one-click plan
+for the fewest payments needed to settle everyone up.
 
 <sub>Built by Athreyas, with Claude (Anthropic).</sub>
 
@@ -14,6 +14,7 @@ fewest payments needed to settle everyone up.
 - See a live **Dashboard** — current-month spend, all-time totals, and a per-person breakdown.
 - Track a single **net balance** per person (Splitwise-style): green = owed to them, red = they owe.
 - Get **suggested settlements** — the smallest set of payments that clears every balance.
+- Set up **recurring monthly expenses** (fixed amount, with an end date) that post automatically.
 - Add people, record settlements, and archive old expenses without losing history.
 
 ## Install
@@ -27,12 +28,15 @@ This is a Google Apps Script project bound to a Google Sheet.
    - `SetupDialog.html`
    - `AddExpenseDialog.html`
    - `AddSettlementDialog.html`
+   - `AddRecurringDialog.html`
    - `ArchiveDialog.html`
 
    Add each HTML file via **＋ → HTML** and name it *without* the `.html` extension
    (e.g. `AddExpenseDialog`).
 4. **Save**, then reload the spreadsheet — a **💰 Expense Manager** menu appears.
 5. Click **💰 Expense Manager → 🔧 Setup**, enter the participant names, and submit.
+6. The first time you add a recurring expense (or on Setup), Apps Script asks for authorization so it
+   can install the daily trigger that auto-posts recurring items. Approve it once.
 
 > Prefer the command line? You can push these files with
 > [`clasp`](https://github.com/google/clasp); the included `appsscript.json` is the project manifest.
@@ -65,6 +69,7 @@ Because balances are formulas reading a rebuilt ledger — never hand-written nu
 | *Master Users* | People list (hidden) |
 | *Ledger* | Auto-generated math cache — do not edit (hidden) |
 | *Archives* | Older expenses moved out of the way (hidden) |
+| *Recurring* | Saved fixed-amount monthly templates, auto-posted (hidden) |
 
 ## Daily use
 
@@ -73,9 +78,33 @@ All actions live under the **💰 Expense Manager** menu:
 - **Add Expense** — date, category, description, amount, split type, payer, and who it's split among.
   Defaults to *paid by the first person, split equally among everyone* (the payer is auto-included).
 - **Add Settlement** — record a payment from one person to another; balances update automatically.
+- **Add Recurring Expense** — save a fixed-amount monthly expense (rent, internet, subscriptions).
+  See *Recurring expenses* below.
 - **Refresh Balances** — fully recalculates everything from the Expenses sheet.
+- **Post Due Recurring Now** — manually post any recurring items due today (the daily trigger does
+  this automatically; this is for catch-up or testing).
 - **Add New User** — adds a person and formats them into every sheet.
 - **Archive Old Expenses** — moves older entries to the Archives sheet to keep things fast.
+
+## Recurring expenses
+
+For fixed, repeating costs (rent, internet, a shared subscription), use **Add Recurring Expense**.
+You set it up once — amount, payer, split, a **start date**, and an optional **end date** — and the
+system posts it automatically each month.
+
+- **Fixed amount only.** The same amount posts every month. If a bill varies, edit that month's row
+  on the Expenses sheet, or use a regular Add Expense instead.
+- **Monthly on the start day.** It recurs on the day-of-month of the start date. The first occurrence
+  is added immediately if the start date is today or earlier. Items set for the 31st post on the last
+  day of shorter months.
+- **Stops at the end date.** Leave the end date blank to repeat indefinitely, or set one to stop.
+- **Fully automatic.** A daily Apps Script trigger (installed during Setup) posts anything due. It is
+  idempotent — each item posts at most once per month, so it never double-charges.
+- **Literal splits.** A recurring item posts exactly the people and split you defined, every month.
+  If group membership changes, edit or stop the item (set its end date) and create a new one.
+
+Templates are stored on a hidden **Recurring** sheet. The first time you add a recurring item the
+trigger is installed, which prompts for authorization once.
 
 ## A live dashboard with Canvas (optional, display-only)
 
@@ -128,7 +157,7 @@ to the largest creditor for the amount that fully clears one of them — and lis
 "Name → Name  $Amount". If everyone is even, show "All settled up — no payments needed." Add a
 small sub-line: "Record a payment via 💰 Expense Manager → 💳 Add Settlement."
 
-Finish with a small, subtle footer line in muted gray: "Expense Tracker • built by Athreyas."
+Finish with a small, subtle footer line in muted gray: "SplitSheet • built by Athreyas."
 Use a soft, modern look with rounded cards and a clean compact UI with small fonts, and offer
 both light and dark mode. This is display only — do not add any data-entry fields, buttons, or
 editing controls.

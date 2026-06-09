@@ -1,5 +1,5 @@
 /**
- * Expense Tracker — Splitwise-style for Google Sheets
+ * SplitSheet — a Splitwise-style shared-expense tracker for Google Sheets
  * V4 — Clean rebuild: single source of truth + 100% live formulas
  * Developed by Athreyas using Claude (Anthropic AI)
  *
@@ -87,7 +87,7 @@ function showSetupDialog() {
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAIL', confirmEmail.getResponseText().trim());
   }
   var html = HtmlService.createHtmlOutputFromFile('SetupDialog').setWidth(500).setHeight(450);
-  ui.showModalDialog(html, '🔧 Setup Expense Tracker');
+  ui.showModalDialog(html, '🔧 Set up SplitSheet');
 }
 
 function showAddUserDialog() {
@@ -201,7 +201,7 @@ function setupAboutSheet() {
   sheet.setColumnWidth(2, 645);
 
   var headerRange = sheet.getRange('A1:B1').merge();
-  headerRange.setValue('💰 EXPENSE TRACKER — QUICK START GUIDE')
+  headerRange.setValue('💰 SPLITSHEET — QUICK START GUIDE')
     .setFontFamily(CONFIG.fonts.header).setFontSize(22).setFontWeight('bold')
     .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
     .setVerticalAlignment('middle').setHorizontalAlignment('center');
@@ -215,7 +215,7 @@ function setupAboutSheet() {
   sheet.setRowHeight(r, 26); r++;
 
   sheet.getRange(r, 1, 1, 2).merge();
-  sheet.getRange(r, 1).setFormula('=HYPERLINK("https://github.com/Athreyas/googlesheets_expense_tracker","🔗 View this project on GitHub")')
+  sheet.getRange(r, 1).setFormula('=HYPERLINK("https://github.com/Athreyas/splitsheet","🔗 View this project on GitHub")')
     .setFontFamily(CONFIG.fonts.body).setFontSize(10).setFontColor('#1a73e8')
     .setBackground('#f1f3f4').setHorizontalAlignment('center').setVerticalAlignment('middle');
   sheet.setRowHeight(r, 26); r++;
@@ -364,7 +364,7 @@ function createExpensesSheet(userArray) {
   sheet.setColumnWidth(7, 140);
   sheet.setColumnWidth(8, 110);
 
-  sheet.getRange('A1:H1').merge().setValue('💳 EXPENSE TRACKER')
+  sheet.getRange('A1:H1').merge().setValue('💳 SPLITSHEET — EXPENSES')
     .setFontFamily(CONFIG.fonts.header).setFontSize(26).setFontWeight('bold')
     .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
@@ -506,7 +506,7 @@ function createDashboardSheet(userArray) {
   sheet.setColumnWidth(8, 120); // Amount
 
   // Title
-  sheet.getRange('A1:H1').merge().setValue('📊 EXPENSE DASHBOARD')
+  sheet.getRange('A1:H1').merge().setValue('📊 SPLITSHEET DASHBOARD')
     .setFontFamily(CONFIG.fonts.header).setFontSize(22).setFontWeight('bold')
     .setBackground(CONFIG.colors.headerBg).setFontColor(CONFIG.colors.headerText)
     .setHorizontalAlignment('center').setVerticalAlignment('middle');
